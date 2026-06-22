@@ -119,6 +119,7 @@ const INITIAL_CABINETS = [
 // Application State
 let cabinets = [];
 let pendingDialogAction = null;
+let userRole = sessionStorage.getItem("eco_user_role") || null;
 
 // DOM Elements
 const trackingTable = document.getElementById("tracking-table");
@@ -156,12 +157,111 @@ const resetDbBtn = document.getElementById("reset-db-btn");
 const themeToggle = document.getElementById("theme-toggle");
 
 // Initialize Application
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
+    setupAccessControl();
+});
+
+// Setup access control prompt modal
+function setupAccessControl() {
+    const modal = document.getElementById("access-modal");
+    const passwordInput = document.getElementById("access-password-input");
+    const loginBtn = document.getElementById("access-login-btn");
+    const guestBtn = document.getElementById("access-guest-btn");
+    const errorMsg = document.getElementById("access-error");
+
+    if (userRole) {
+        modal.style.display = "none";
+        initializeApplication();
+        return;
+    }
+
+    modal.style.display = "flex";
+    passwordInput.focus();
+
+    const handleLogin = () => {
+        const password = passwordInput.value.trim();
+        if (password === "COCESNA1") {
+            userRole = "admin";
+            sessionStorage.setItem("eco_user_role", "admin");
+            modal.style.display = "none";
+            initializeApplication();
+        } else if (password === "COCESNA2") {
+            userRole = "viewer";
+            sessionStorage.setItem("eco_user_role", "viewer");
+            modal.style.display = "none";
+            initializeApplication();
+        } else {
+            errorMsg.style.display = "block";
+            passwordInput.value = "";
+            passwordInput.focus();
+        }
+    };
+
+    loginBtn.addEventListener("click", handleLogin);
+    passwordInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            handleLogin();
+        }
+    });
+
+    guestBtn.addEventListener("click", () => {
+        userRole = "viewer";
+        sessionStorage.setItem("eco_user_role", "viewer");
+        modal.style.display = "none";
+        initializeApplication();
+    });
+}
+
+async function initializeApplication() {
+    applyUserRole();
     await loadDatabase();
     setupEventListeners();
     updateThemeIcon();
     renderApp();
-});
+}
+
+function applyUserRole() {
+    const badgeContainer = document.getElementById("role-badge-container");
+    if (!badgeContainer) return;
+
+    if (userRole === "admin") {
+        badgeContainer.innerHTML = `
+            <span class="role-badge role-admin" title="Tienes acceso completo para modificar y guardar cambios">
+                <span class="material-symbols-rounded" style="font-size: 14px;">edit</span>
+                Editor
+            </span>
+            <button id="logout-btn" class="logout-btn" title="Cerrar sesión / Cambiar clave">
+                <span class="material-symbols-rounded" style="font-size: 18px;">logout</span>
+            </button>
+        `;
+        
+        // Show edit buttons
+        addRowBtn.style.display = "inline-flex";
+        restoreJsonBtn.style.display = "inline-flex";
+        resetDbBtn.style.display = "inline-flex";
+    } else {
+        badgeContainer.innerHTML = `
+            <span class="role-badge role-viewer" title="Modo consulta: No puedes realizar modificaciones">
+                <span class="material-symbols-rounded" style="font-size: 14px;">visibility</span>
+                Solo Lectura
+            </span>
+            <button id="logout-btn" class="logout-btn" title="Ingresar clave de Editor">
+                <span class="material-symbols-rounded" style="font-size: 18px;">login</span>
+            </button>
+        `;
+        
+        // Hide edit buttons
+        addRowBtn.style.display = "none";
+        restoreJsonBtn.style.display = "none";
+        resetDbBtn.style.display = "none";
+    }
+
+    // Set up logout button event
+    document.getElementById("logout-btn").addEventListener("click", () => {
+        sessionStorage.removeItem("eco_user_role");
+        window.location.reload();
+    });
+}
 
 // Load data from Firestore or initialize with default values
 async function loadDatabase() {
@@ -356,6 +456,12 @@ function renderTable() {
         return matchSearch && matchSede && matchCap && matchEst;
     });
 
+    const isViewer = userRole === "viewer";
+    const headerActions = trackingTable.querySelector("thead th.col-actions");
+    if (headerActions) {
+        headerActions.style.display = isViewer ? "none" : "table-cell";
+    }
+
     if (filtered.length === 0) {
         noResults.style.display = "flex";
         trackingTable.querySelector("thead").style.display = window.innerWidth > 980 ? "table-header-group" : "none";
@@ -380,17 +486,19 @@ function renderTable() {
         }
         row.setAttribute("data-id", c.id);
 
+        const disabledAttr = isViewer ? "disabled" : "";
+
         // Responsive labels for mobile view (data-label matches CSS content)
         row.innerHTML = `
             <td class="col-sede-cell" data-label="Sede">
-                <input type="text" class="cell-input val-sede" value="${c.sede || 'No especificado'}" placeholder="Sede">
+                <input type="text" class="cell-input val-sede" value="${c.sede || 'No especificado'}" placeholder="Sede" ${disabledAttr}>
             </td>
             <td class="col-area-cell" data-label="Área">
-                <input type="text" class="cell-input val-area" value="${c.area || 'No especificado'}" placeholder="Área">
+                <input type="text" class="cell-input val-area" value="${c.area || 'No especificado'}" placeholder="Área" ${disabledAttr}>
             </td>
             <td class="col-capacidad-cell" data-label="Capacidad del Equipo">
                 <div class="cell-select-wrapper">
-                    <select class="cell-select val-capacidad">
+                    <select class="cell-select val-capacidad" ${disabledAttr}>
                         <option value="12.000 BTU" ${c.capacidad === '12.000 BTU' ? 'selected' : ''}>12.000 BTU</option>
                         <option value="18.000 BTU" ${c.capacidad === '18.000 BTU' ? 'selected' : ''}>18.000 BTU</option>
                         <option value="24.000 BTU" ${c.capacidad === '24.000 BTU' ? 'selected' : ''}>24.000 BTU</option>
@@ -401,23 +509,23 @@ function renderTable() {
                 </div>
             </td>
             <td class="col-gabinete-cell" data-label="Gabinete de Protección Eléctrica">
-                <input type="text" class="cell-input val-gabinete" value="${c.gabinete || 'Suministro e Instalación de Gabinete'}" placeholder="Gabinete de Protección">
+                <input type="text" class="cell-input val-gabinete" value="${c.gabinete || 'Suministro e Instalación de Gabinete'}" placeholder="Gabinete de Protección" ${disabledAttr}>
             </td>
             <td class="col-instalado-cell" data-label="Instalado">
                 <label class="switch">
-                    <input type="checkbox" class="val-instalado" ${c.instalado ? 'checked' : ''}>
+                    <input type="checkbox" class="val-instalado" ${c.instalado ? 'checked' : ''} ${disabledAttr}>
                     <span class="slider"></span>
                 </label>
             </td>
             <td class="col-reporte-cell" data-label="Link de Reporte">
                 <div class="report-link-cell">
-                    <input type="url" class="cell-input val-reporte" value="${c.reporteUrl || ''}" placeholder="Pegar URL del reporte...">
+                    <input type="url" class="cell-input val-reporte" value="${c.reporteUrl || ''}" placeholder="Pegar URL del reporte..." ${disabledAttr}>
                     <a href="${c.reporteUrl || '#'}" target="_blank" class="report-link-btn ${c.reporteUrl ? '' : 'disabled'}" title="Abrir reporte en pestaña nueva">
                         <span class="material-symbols-rounded" style="font-size: 18px;">open_in_new</span>
                     </a>
                 </div>
             </td>
-            <td class="col-actions-cell" data-label="Acciones">
+            <td class="col-actions-cell" data-label="Acciones" ${isViewer ? 'style="display:none;"' : ''}>
                 <div class="actions-cell">
                     <button class="icon-btn-small duplicate-row-btn" title="Duplicar registro">
                         <span class="material-symbols-rounded" style="font-size:18px;">content_copy</span>

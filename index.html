@@ -28,7 +28,8 @@
                     <span class="subtitle">Protecciones Eléctricas COCESNA</span>
                 </div>
             </div>
-            <div class="header-actions">
+            <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+                <div id="role-badge-container" class="role-badge-container"></div>
                 <button id="theme-toggle" class="icon-btn" title="Cambiar tema">
                     <span class="material-symbols-rounded">dark_mode</span>
                 </button>
@@ -195,6 +196,22 @@
             <div class="modal-actions">
                 <button id="confirm-cancel" class="btn btn-tonal">Cancelar</button>
                 <button id="confirm-ok" class="btn btn-danger">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login/Access Modal -->
+    <div id="access-modal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+            <h2 id="access-title" style="font-family: var(--font-heading); font-weight: 700;">Acceso al Sistema</h2>
+            <p id="access-message">Ingrese su clave para continuar. El modo Editor permite realizar cambios; el modo Lector es de solo consulta.</p>
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <input type="password" id="access-password-input" class="cell-input" placeholder="Clave de acceso..." style="border: 1px solid var(--outline-variant); padding: 12px 16px; border-radius: var(--radius-xs);">
+                <div id="access-error" style="color: var(--error); font-size: 0.85rem; display: none; font-weight: 600;">Clave incorrecta. Inténtelo de nuevo.</div>
+            </div>
+            <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 8px; width: 100%;">
+                <button id="access-guest-btn" class="btn btn-tonal">Acceso Lector</button>
+                <button id="access-login-btn" class="btn btn-primary">Entrar</button>
             </div>
         </div>
     </div>

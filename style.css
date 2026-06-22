@@ -981,3 +981,49 @@ tr.row-installed:hover td {
         opacity: 1;
     }
 }
+
+/* Role Badge styling */
+.role-badge-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.role-badge {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    transition: all var(--transition-fast);
+}
+.role-admin {
+    background-color: var(--secondary-container);
+    color: var(--on-secondary-container);
+    border: 1px solid var(--secondary);
+}
+.role-viewer {
+    background-color: var(--surface-container);
+    color: var(--outline);
+    border: 1px solid var(--outline-variant);
+}
+.logout-btn {
+    background: transparent;
+    border: none;
+    color: var(--on-surface-variant);
+    cursor: pointer;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--transition-fast);
+}
+.logout-btn:hover {
+    background-color: var(--surface-variant);
+    color: var(--error);
+}
