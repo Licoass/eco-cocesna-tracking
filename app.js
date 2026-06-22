@@ -1,3 +1,5 @@
+import "./firebase.js";
+
 // Initial dataset of 70 cabinets from the Cocesna quotation (CTV-141)
 // Ordered exactly as they appear in the document, grouped by Sede principal
 const INITIAL_CABINETS = [
@@ -154,33 +156,42 @@ const resetDbBtn = document.getElementById("reset-db-btn");
 const themeToggle = document.getElementById("theme-toggle");
 
 // Initialize Application
-document.addEventListener("DOMContentLoaded", () => {
-    loadDatabase();
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadDatabase();
     setupEventListeners();
     updateThemeIcon();
     renderApp();
 });
 
-// Load data from LocalStorage or initialize with default values
-function loadDatabase() {
-    const stored = localStorage.getItem("eco_ingenieria_cabinets_db");
-    if (stored) {
-        try {
-            cabinets = JSON.parse(stored);
-        } catch (e) {
-            console.error("Error al cargar la base de datos de localStorage, reseteando...", e);
-            cabinets = JSON.parse(JSON.stringify(INITIAL_CABINETS));
-            saveDatabase();
+// Load data from Firestore or initialize with default values
+async function loadDatabase() {
+    try {
+        let data = await window.loadFirestoreData();
+        if (!data || data.length === 0) {
+            console.log("Firestore está vacío, inicializando con los registros de la cotización original...");
+            // Save initial cabinets to Firestore, including an 'order' field to preserve order
+            for (let i = 0; i < INITIAL_CABINETS.length; i++) {
+                const cabinet = { ...INITIAL_CABINETS[i], order: i };
+                await window.createCabinet(cabinet);
+            }
+            data = await window.loadFirestoreData();
         }
-    } else {
-        cabinets = JSON.parse(JSON.stringify(INITIAL_CABINETS));
-        saveDatabase();
+        cabinets = data.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    } catch (e) {
+        console.error("Error cargando datos de Firestore:", e);
+        showToast("Error al cargar datos desde Firestore. Usando datos locales.", "error");
+        // Fallback to localStorage
+        const stored = localStorage.getItem("eco_ingenieria_cabinets_db");
+        if (stored) {
+            try {
+                cabinets = JSON.parse(stored);
+            } catch (err) {
+                cabinets = JSON.parse(JSON.stringify(INITIAL_CABINETS));
+            }
+        } else {
+            cabinets = JSON.parse(JSON.stringify(INITIAL_CABINETS));
+        }
     }
-}
-
-// Save data to LocalStorage
-function saveDatabase() {
-    localStorage.setItem("eco_ingenieria_cabinets_db", JSON.stringify(cabinets));
 }
 
 // Setup Event Listeners
@@ -236,11 +247,27 @@ function setupEventListeners() {
         showConfirmModal(
             "Restablecer Cotización",
             "¿Estás seguro de que deseas restablecer todos los registros al estado original de la cotización? Se perderán todos los avances y links registrados.",
-            () => {
-                cabinets = JSON.parse(JSON.stringify(INITIAL_CABINETS));
-                saveDatabase();
-                renderApp();
-                showToast("Datos restablecidos al estado original de la cotización", "success");
+            async () => {
+                showToast("Restableciendo base de datos...", "info");
+                try {
+                    // Delete all existing documents in Firestore cabinets collection
+                    for (const cab of cabinets) {
+                        await window.deleteCabinet(cab.id);
+                    }
+                    // Re-initialize with original quotation cabinets
+                    for (let i = 0; i < INITIAL_CABINETS.length; i++) {
+                        const cabinet = { ...INITIAL_CABINETS[i], order: i };
+                        await window.createCabinet(cabinet);
+                    }
+                    cabinets = JSON.parse(JSON.stringify(INITIAL_CABINETS));
+                    cabinets.forEach((cab, idx) => cab.order = idx);
+                    populateSedeDropdown();
+                    renderApp();
+                    showToast("Datos restablecidos al estado original de la cotización", "success");
+                } catch (err) {
+                    console.error("Error al restablecer base de datos:", err);
+                    showToast("Error al restablecer la base de datos en Firestore", "error");
+                }
             }
         );
     });
@@ -411,15 +438,21 @@ function renderTable() {
         const inputReporte = row.querySelector(".val-reporte");
         const btnLink = row.querySelector(".report-link-btn");
         
-        const saveRowData = () => {
+        const saveRowData = async () => {
             const index = cabinets.findIndex(x => x.id === c.id);
             if (index !== -1) {
                 const oldSede = cabinets[index].sede;
-                cabinets[index].sede = inputSede.value.trim();
-                cabinets[index].area = inputArea.value.trim();
-                cabinets[index].capacidad = selectCapacidad.value;
-                cabinets[index].gabinete = inputGabinete.value.trim();
-                cabinets[index].reporteUrl = inputReporte.value.trim();
+                const updatedSede = inputSede.value.trim();
+                const updatedArea = inputArea.value.trim();
+                const updatedCapacidad = selectCapacidad.value;
+                const updatedGabinete = inputGabinete.value.trim();
+                const updatedReporte = inputReporte.value.trim();
+
+                cabinets[index].sede = updatedSede;
+                cabinets[index].area = updatedArea;
+                cabinets[index].capacidad = updatedCapacidad;
+                cabinets[index].gabinete = updatedGabinete;
+                cabinets[index].reporteUrl = updatedReporte;
                 
                 // Update link button status
                 if (cabinets[index].reporteUrl) {
@@ -430,7 +463,19 @@ function renderTable() {
                     btnLink.classList.add("disabled");
                 }
                 
-                saveDatabase();
+                try {
+                    await window.updateCabinet(c.id, {
+                        sede: updatedSede,
+                        area: updatedArea,
+                        capacidad: updatedCapacidad,
+                        gabinete: updatedGabinete,
+                        reporteUrl: updatedReporte
+                    });
+                    showToast("Cambios guardados en Firestore", "success");
+                } catch (err) {
+                    console.error("Error al actualizar gabinete:", err);
+                    showToast("Error al guardar cambios en Firestore", "error");
+                }
                 
                 // If Sede changed, repopulate filter dropdown
                 if (oldSede !== cabinets[index].sede) {
@@ -441,25 +486,41 @@ function renderTable() {
             }
         };
 
+        const handleKeyDown = (e) => {
+            if (e.key === "Enter") {
+                e.target.blur();
+            }
+        };
+
         inputSede.addEventListener("blur", saveRowData);
+        inputSede.addEventListener("keydown", handleKeyDown);
         inputArea.addEventListener("blur", saveRowData);
+        inputArea.addEventListener("keydown", handleKeyDown);
         selectCapacidad.addEventListener("change", saveRowData);
         inputGabinete.addEventListener("blur", saveRowData);
+        inputGabinete.addEventListener("keydown", handleKeyDown);
         inputReporte.addEventListener("blur", saveRowData);
+        inputReporte.addEventListener("keydown", handleKeyDown);
 
-        checkboxInstalado.addEventListener("change", (e) => {
+        checkboxInstalado.addEventListener("change", async (e) => {
             const index = cabinets.findIndex(x => x.id === c.id);
             if (index !== -1) {
-                cabinets[index].instalado = e.target.checked;
-                saveDatabase();
-                updateKPIs();
-                
-                if (e.target.checked) {
-                    row.classList.add("row-installed");
-                    showToast("Gabinete marcado como Instalado", "success");
-                } else {
-                    row.classList.remove("row-installed");
-                    showToast("Gabinete marcado como Pendiente", "success");
+                const isChecked = e.target.checked;
+                cabinets[index].instalado = isChecked;
+                try {
+                    await window.updateCabinet(c.id, { instalado: isChecked });
+                    updateKPIs();
+                    
+                    if (isChecked) {
+                        row.classList.add("row-installed");
+                        showToast("Gabinete marcado como Instalado", "success");
+                    } else {
+                        row.classList.remove("row-installed");
+                        showToast("Gabinete marcado como Pendiente", "success");
+                    }
+                } catch (err) {
+                    console.error("Error al actualizar estado de instalación:", err);
+                    showToast("Error al guardar estado en Firestore", "error");
                 }
             }
         });
@@ -542,8 +603,9 @@ function renderSedeBreakdown() {
 }
 
 // Add a new row to the tracking sheet
-function addNewRow() {
+async function addNewRow() {
     const newId = "custom-" + Date.now();
+    const maxOrder = cabinets.length > 0 ? Math.max(...cabinets.map(cab => cab.order ?? 0)) : -1;
     const newCabinet = {
         id: newId,
         sede: "Nueva Sede",
@@ -551,60 +613,78 @@ function addNewRow() {
         capacidad: "No especificado",
         gabinete: "Suministro e Instalación de Gabinete Protecciones electricas A/A Monofasico",
         instalado: false,
-        reporteUrl: ""
+        reporteUrl: "",
+        order: maxOrder + 1
     };
     
-    cabinets.push(newCabinet);
-    saveDatabase();
-    populateSedeDropdown();
-    renderApp();
-    
-    // Scroll to the new row
-    setTimeout(() => {
-        const newRow = document.querySelector(`tr[data-id="${newId}"]`);
-        if (newRow) {
-            newRow.scrollIntoView({ behavior: "smooth", block: "center" });
-            newRow.classList.add("row-highlight-pulse");
-            setTimeout(() => newRow.classList.remove("row-highlight-pulse"), 2000);
-            
-            // Focus on Sede input of the new row
-            const sedeInput = newRow.querySelector(".val-sede");
-            if (sedeInput) sedeInput.focus();
-        }
-    }, 100);
-    
-    showToast("Nuevo gabinete agregado al final", "success");
+    try {
+        cabinets.push(newCabinet);
+        await window.createCabinet(newCabinet);
+        populateSedeDropdown();
+        renderApp();
+        
+        // Scroll to the new row
+        setTimeout(() => {
+            const newRow = document.querySelector(`tr[data-id="${newId}"]`);
+            if (newRow) {
+                newRow.scrollIntoView({ behavior: "smooth", block: "center" });
+                newRow.classList.add("row-highlight-pulse");
+                setTimeout(() => newRow.classList.remove("row-highlight-pulse"), 2000);
+                
+                // Focus on Sede input of the new row
+                const sedeInput = newRow.querySelector(".val-sede");
+                if (sedeInput) sedeInput.focus();
+            }
+        }, 100);
+        
+        showToast("Nuevo gabinete agregado al final", "success");
+    } catch (err) {
+        console.error("Error al agregar fila:", err);
+        showToast("Error al agregar el registro en Firestore", "error");
+    }
 }
 
 // Duplicate a specific row
-function duplicateRow(id) {
+async function duplicateRow(id) {
     const index = cabinets.findIndex(c => c.id === id);
     if (index !== -1) {
         const original = cabinets[index];
         const copyId = "dup-" + Date.now();
+        
+        const originalOrder = original.order ?? 0;
+        const nextCabinet = cabinets[index + 1];
+        const nextOrder = nextCabinet ? (nextCabinet.order ?? (originalOrder + 1)) : (originalOrder + 1);
+        const cloneOrder = (originalOrder + nextOrder) / 2;
+
         const clone = {
             ...original,
             id: copyId,
             instalado: false,
-            reporteUrl: ""
+            reporteUrl: "",
+            order: cloneOrder
         };
         
-        // Insert right after the original row
-        cabinets.splice(index + 1, 0, clone);
-        saveDatabase();
-        renderApp();
-        
-        // Visual indicator
-        setTimeout(() => {
-            const dupRow = document.querySelector(`tr[data-id="${copyId}"]`);
-            if (dupRow) {
-                dupRow.scrollIntoView({ behavior: "smooth", block: "center" });
-                dupRow.classList.add("row-highlight-pulse");
-                setTimeout(() => dupRow.classList.remove("row-highlight-pulse"), 2000);
-            }
-        }, 100);
+        try {
+            // Insert right after the original row
+            cabinets.splice(index + 1, 0, clone);
+            await window.createCabinet(clone);
+            renderApp();
+            
+            // Visual indicator
+            setTimeout(() => {
+                const dupRow = document.querySelector(`tr[data-id="${copyId}"]`);
+                if (dupRow) {
+                    dupRow.scrollIntoView({ behavior: "smooth", block: "center" });
+                    dupRow.classList.add("row-highlight-pulse");
+                    setTimeout(() => dupRow.classList.remove("row-highlight-pulse"), 2000);
+                }
+            }, 100);
 
-        showToast("Gabinete duplicado", "success");
+            showToast("Gabinete duplicado", "success");
+        } catch (err) {
+            console.error("Error al duplicar gabinete:", err);
+            showToast("Error al duplicar el registro en Firestore", "error");
+        }
     }
 }
 
@@ -618,12 +698,17 @@ function deleteRow(id) {
         showConfirmModal(
             "Eliminar Registro",
             `¿Estás seguro de que deseas eliminar este gabinete de protección eléctrica? <br><strong>${desc}</strong>`,
-            () => {
-                cabinets.splice(index, 1);
-                saveDatabase();
-                populateSedeDropdown();
-                renderApp();
-                showToast("Registro eliminado con éxito", "success");
+            async () => {
+                try {
+                    cabinets.splice(index, 1);
+                    await window.deleteCabinet(id);
+                    populateSedeDropdown();
+                    renderApp();
+                    showToast("Registro eliminado con éxito", "success");
+                } catch (err) {
+                    console.error("Error al eliminar gabinete:", err);
+                    showToast("Error al eliminar el registro en Firestore", "error");
+                }
             }
         );
     }
@@ -712,11 +797,28 @@ function importJSON(event) {
                     showConfirmModal(
                         "Importar Respaldo",
                         `Se cargará un respaldo con ${parsed.length} gabinetes. Esto reemplazará COMPLETAMENTE tus datos actuales de seguimiento. ¿Deseas continuar?`,
-                        () => {
-                            cabinets = parsed;
-                            saveDatabase();
-                            renderApp();
-                            showToast("Base de datos restaurada con éxito", "success");
+                        async () => {
+                            showToast("Importando respaldo...", "info");
+                            try {
+                                // Delete current documents
+                                for (const cab of cabinets) {
+                                    await window.deleteCabinet(cab.id);
+                                }
+                                // Insert imported documents
+                                for (let i = 0; i < parsed.length; i++) {
+                                    if (parsed[i].order === undefined) {
+                                        parsed[i].order = i;
+                                    }
+                                    await window.createCabinet(parsed[i]);
+                                }
+                                cabinets = parsed;
+                                populateSedeDropdown();
+                                renderApp();
+                                showToast("Base de datos restaurada con éxito", "success");
+                            } catch (err) {
+                                console.error("Error al importar respaldo:", err);
+                                showToast("Error al restaurar los datos en Firestore", "error");
+                            }
                         }
                     );
                 } else {
@@ -784,3 +886,4 @@ style.innerHTML = `
 }
 `;
 document.head.appendChild(style);
+// Ultima actualizacion: 2026-06-22 - Integracion Firestore exitosa
