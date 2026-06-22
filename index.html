@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguimiento de Gabinetes de Protección Eléctrica | Eco Ingeniería</title>
+    
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme">
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="header-logo-title">
+                <img src="logo-aire-acondicionado-eco-ingenieria-energia-solar.png" alt="Eco Ingeniería Logo" class="app-logo" onerror="this.src='https://via.placeholder.com/150x50?text=Eco+Ingeniería'">
+                <div class="header-text">
+                    <h1>Seguimiento de Gabinetes</h1>
+                    <span class="subtitle">Protecciones Eléctricas COCESNA</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="theme-toggle" class="icon-btn" title="Cambiar tema">
+                    <span class="material-symbols-rounded">dark_mode</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+        <!-- KPI Dashboard Summary Widgets -->
+        <section class="kpi-section" aria-label="Estadísticas de instalación">
+            <!-- Progress Card -->
+            <div class="kpi-card progress-kpi">
+                <div class="kpi-chart-container">
+                    <svg class="progress-ring" width="100" height="100">
+                        <circle class="progress-ring__circle-bg" stroke="var(--surface-variant)" stroke-width="8" fill="transparent" r="40" cx="50" cy="50"/>
+                        <circle id="progress-circle" class="progress-ring__circle" stroke="var(--primary)" stroke-width="8" fill="transparent" r="40" cx="50" cy="50"/>
+                    </svg>
+                    <div class="progress-ring-text">
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                </div>
+                <div class="kpi-details">
+                    <h3>Avance Total</h3>
+                    <p class="kpi-value"><span id="installed-fraction">0/70</span></p>
+                    <p class="kpi-label">Gabinetes Instalados</p>
+                </div>
+            </div>
+
+            <!-- Installed Card -->
+            <div class="kpi-card status-card installed">
+                <div class="kpi-icon-wrapper">
+                    <span class="material-symbols-rounded">check_circle</span>
+                </div>
+                <div class="kpi-details">
+                    <h3>Instalados</h3>
+                    <p class="kpi-value" id="installed-count">0</p>
+                    <p class="kpi-label">Verificados en sitio</p>
+                </div>
+            </div>
+
+            <!-- Pending Card -->
+            <div class="kpi-card status-card pending">
+                <div class="kpi-icon-wrapper">
+                    <span class="material-symbols-rounded">pending_actions</span>
+                </div>
+                <div class="kpi-details">
+                    <h3>Pendientes</h3>
+                    <p class="kpi-value" id="pending-count">70</p>
+                    <p class="kpi-label">Por instalar</p>
+                </div>
+            </div>
+
+            <!-- Sede Leaderboard Card -->
+            <div class="kpi-card breakdown-card">
+                <h3>Resumen por Sede</h3>
+                <div class="breakdown-list" id="sede-breakdown">
+                    <!-- Dynamic rendering of sede progress -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls, Filters and Action Buttons -->
+        <section class="controls-section" aria-label="Controles y filtros">
+            <div class="search-filter-row">
+                <div class="search-box">
+                    <span class="material-symbols-rounded search-icon">search</span>
+                    <input type="text" id="search-input" placeholder="Buscar por sede, área o gabinete...">
+                    <button id="clear-search-btn" class="icon-btn-small" style="display:none;" title="Limpiar búsqueda">
+                        <span class="material-symbols-rounded">close</span>
+                    </button>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-wrapper">
+                        <select id="filter-sede">
+                            <option value="all">Todas las Sedes</option>
+                            <!-- Dynamically populated -->
+                        </select>
+                    </div>
+                    <div class="filter-wrapper">
+                        <select id="filter-capacidad">
+                            <option value="all">Todas las Capacidades</option>
+                            <option value="12.000 BTU">12.000 BTU</option>
+                            <option value="18.000 BTU">18.000 BTU</option>
+                            <option value="24.000 BTU">24.000 BTU</option>
+                            <option value="36.000 BTU">36.000 BTU</option>
+                            <option value="60.000 BTU">60.000 BTU</option>
+                            <option value="No especificado">No especificado</option>
+                        </select>
+                    </div>
+                    <div class="filter-wrapper">
+                        <select id="filter-estado">
+                            <option value="all">Todos los Estados</option>
+                            <option value="instalado">Instalado</option>
+                            <option value="pendiente">Pendiente</option>
+                        </select>
+                    </div>
+                    <button id="reset-filters-btn" class="btn btn-tonal btn-icon-only" title="Restablecer filtros">
+                        <span class="material-symbols-rounded">filter_alt_off</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="action-buttons-row">
+                <button id="add-row-btn" class="btn btn-primary">
+                    <span class="material-symbols-rounded">add</span>
+                    <span>Agregar Gabinete</span>
+                </button>
+                <div class="action-group-right">
+                    <button id="export-csv-btn" class="btn btn-secondary">
+                        <span class="material-symbols-rounded">download_for_offline</span>
+                        <span>Exportar Excel (CSV)</span>
+                    </button>
+                    <button id="backup-json-btn" class="btn btn-tonal" title="Respaldar datos en archivo JSON">
+                        <span class="material-symbols-rounded">backup</span>
+                        <span>Respaldo JSON</span>
+                    </button>
+                    <button id="restore-json-btn" class="btn btn-tonal" title="Restaurar datos desde archivo JSON">
+                        <span class="material-symbols-rounded">restore</span>
+                        <span>Restaurar</span>
+                    </button>
+                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                    <button id="reset-db-btn" class="btn btn-danger" title="Restablecer a valores originales de cotización">
+                        <span class="material-symbols-rounded">restart_alt</span>
+                        <span>Restablecer Cotización</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Tracking Table Container -->
+        <section class="table-section" aria-label="Tabla de seguimiento de gabinetes">
+            <div class="table-container">
+                <table id="tracking-table">
+                    <thead>
+                        <tr>
+                            <th class="col-id" style="display:none;">ID</th>
+                            <th class="col-sede">Sede</th>
+                            <th class="col-area">Área</th>
+                            <th class="col-capacidad">Capacidad del Equipo</th>
+                            <th class="col-gabinete">Gabinete de Protección Eléctrica</th>
+                            <th class="col-instalado">Instalado</th>
+                            <th class="col-reporte">Link de Reporte</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Dynamic rows here -->
+                    </tbody>
+                </table>
+                <div id="no-results" class="no-results-view" style="display: none;">
+                    <span class="material-symbols-rounded">search_off</span>
+                    <p>No se encontraron gabinetes que coincidan con los filtros aplicados.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Dialog Confirmation Modals (Material style) -->
+    <div id="confirm-dialog" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+            <h2 id="confirm-title">Título del diálogo</h2>
+            <p id="confirm-message">Mensaje de confirmación del diálogo.</p>
+            <div class="modal-actions">
+                <button id="confirm-cancel" class="btn btn-tonal">Cancelar</button>
+                <button id="confirm-ok" class="btn btn-danger">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification System -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
